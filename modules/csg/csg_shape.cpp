@@ -34,6 +34,7 @@
 #include "core/math/geometry_2d.h"
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
+#include "scene/main/scene_tree.h"
 #include "scene/resources/3d/navigation_mesh_source_geometry_data_3d.h"
 #include "scene/resources/navigation_mesh.h"
 #include "servers/rendering/rendering_server.h"
@@ -47,6 +48,8 @@
 #endif // NAVIGATION_3D_DISABLED
 
 #include <manifold/manifold.h>
+
+#include <cfloat> // FLT_EPSILON
 
 #ifndef NAVIGATION_3D_DISABLED
 Callable CSGShape3D::_navmesh_source_geometry_parsing_callback;
