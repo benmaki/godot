@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  skeleton_2d_editor_plugin.h                                           */
+/*  animation_blend_space_2d.compat.inc                                   */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -28,50 +28,22 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#pragma once
+#ifndef DISABLE_DEPRECATED
 
-#include "editor/plugins/editor_plugin.h"
-#include "scene/2d/skeleton_2d.h"
+#include "animation_blend_space_2d.h"
 
-class AcceptDialog;
-class MenuButton;
+#include "core/object/class_db.h"
 
-class Skeleton2DEditor : public Control {
-	GDCLASS(Skeleton2DEditor, Control);
+void AnimationNodeBlendSpace2D::_add_blend_point_bind_compat_110369(const Ref<AnimationRootNode> &p_node, const Vector2 &p_position, int p_at_index) {
+	int n = p_at_index == -1 ? blend_points_used : p_at_index;
+	while (find_blend_point_by_name(itos(n)) != -1) {
+		n++;
+	}
+	add_blend_point(p_node, p_position, p_at_index, StringName(itos(n)));
+}
 
-	enum Menu {
-		MENU_OPTION_SET_REST,
-		MENU_OPTION_MAKE_REST,
-	};
+void AnimationNodeBlendSpace2D::_bind_compatibility_methods() {
+	ClassDB::bind_compatibility_method(D_METHOD("add_blend_point", "node", "pos", "at_index"), &AnimationNodeBlendSpace2D::_add_blend_point_bind_compat_110369, DEFVAL(-1));
+}
 
-	Skeleton2D *node = nullptr;
-
-	MenuButton *options = nullptr;
-	AcceptDialog *err_dialog = nullptr;
-
-	void _menu_option(int p_option);
-
-	//void _create_uv_lines();
-	friend class Skeleton2DEditorPlugin;
-
-protected:
-	void _node_removed(Node *p_node);
-
-public:
-	void edit(Skeleton2D *p_sprite);
-	Skeleton2DEditor();
-};
-
-class Skeleton2DEditorPlugin : public EditorPlugin {
-	GDCLASS(Skeleton2DEditorPlugin, EditorPlugin);
-
-	Skeleton2DEditor *sprite_editor = nullptr;
-
-public:
-	virtual String get_plugin_name() const override { return "Skeleton2D"; }
-	virtual void edit(Object *p_object) override;
-	virtual bool handles(Object *p_object) const override;
-	virtual void make_visible(bool p_visible) override;
-
-	Skeleton2DEditorPlugin();
-};
+#endif // DISABLE_DEPRECATED
