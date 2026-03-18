@@ -42,14 +42,11 @@
 #include "editor/settings/editor_settings.h"
 #include "editor/themes/editor_scale.h"
 #include "scene/animation/animation_blend_tree.h"
-#include "scene/animation/animation_player.h"
 #include "scene/gui/button.h"
 #include "scene/gui/check_box.h"
 #include "scene/gui/grid_container.h"
 #include "scene/gui/line_edit.h"
-#include "scene/gui/menu_button.h"
 #include "scene/gui/option_button.h"
-#include "scene/gui/panel.h"
 #include "scene/gui/panel_container.h"
 #include "scene/gui/rich_text_label.h"
 #include "scene/gui/separator.h"
@@ -455,7 +452,7 @@ void AnimationNodeBlendSpace2DEditor::_add_animation_type(int p_index) {
 	updating = true;
 	EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
 	undo_redo->create_action(TTR("Add Animation Point"));
-	undo_redo->add_do_method(blend_space.ptr(), "add_blend_point", anim, add_point_pos, -1, _get_safe_name(blend_space, animations_to_add[p_index]));
+	undo_redo->add_do_method(blend_space.ptr(), "add_blend_point", anim, add_point_pos, -1, _get_safe_name(blend_space, String(animations_to_add[p_index]).validate_node_name()));
 	undo_redo->add_undo_method(blend_space.ptr(), "remove_blend_point", blend_space->get_blend_point_count());
 	undo_redo->add_do_method(this, "_update_space");
 	undo_redo->add_undo_method(this, "_update_space");
