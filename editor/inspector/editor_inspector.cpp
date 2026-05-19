@@ -36,7 +36,6 @@
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "core/os/keyboard.h"
-#include "core/variant/typed_dictionary.h" // IWYU pragma: keep. For EditorDebuggerRemoteObjects.
 #include "editor/debugger/editor_debugger_inspector.h"
 #include "editor/debugger/editor_debugger_node.h"
 #include "editor/doc/doc_tools.h"
@@ -1998,10 +1997,6 @@ void EditorInspectorCategory::_handle_menu_option(int p_option) {
 }
 
 void EditorInspectorCategory::_popup_context_menu(const Point2i &p_position) {
-	if (!is_favorite && doc_class_name.is_empty()) {
-		return;
-	}
-
 	if (menu == nullptr) {
 		menu = memnew(PopupMenu);
 
@@ -2011,8 +2006,10 @@ void EditorInspectorCategory::_popup_context_menu(const Point2i &p_position) {
 			menu->add_icon_item(theme_cache.icon_copy, TTRC("Copy Category Values"), MENU_COPY_VALUE);
 			menu->add_icon_item(theme_cache.icon_paste, TTRC("Paste Category Values"), MENU_PASTE_VALUE);
 
-			menu->add_item(TTRC("Open Documentation"), MENU_OPEN_DOCS);
-			menu->set_item_disabled(-1, !EditorHelp::get_doc_data()->class_list.has(doc_class_name));
+			if (!doc_class_name.is_empty()) {
+				menu->add_item(TTRC("Open Documentation"), MENU_OPEN_DOCS);
+				menu->set_item_disabled(-1, !EditorHelp::get_doc_data()->class_list.has(doc_class_name));
+			}
 		}
 
 		menu->connect(SceneStringName(id_pressed), callable_mp(this, &EditorInspectorCategory::_handle_menu_option));
@@ -2026,7 +2023,7 @@ void EditorInspectorCategory::_popup_context_menu(const Point2i &p_position) {
 	if (menu_icon_dirty) {
 		if (is_favorite) {
 			menu->set_item_icon(menu->get_item_index(MENU_UNFAVORITE_ALL), theme_cache.icon_unfavorite);
-		} else {
+		} else if (!doc_class_name.is_empty()) {
 			menu->set_item_icon(menu->get_item_index(MENU_OPEN_DOCS), theme_cache.icon_help);
 		}
 		menu_icon_dirty = false;
@@ -2261,7 +2258,7 @@ void EditorInspectorSection::_notification(int p_what) {
 				Ref<Texture2D> key = theme_cache.icon_gui_animation_key;
 				if (keying && key.is_valid()) {
 					Point2 key_position;
-					key_position.x = (rtl ? margin_end : (get_size().width - key->get_width() - margin_end)) - theme_cache.padding_size / 2;
+					key_position.x = rtl ? margin_end + theme_cache.padding_size / 2 : (get_size().width - key->get_width() - margin_end - theme_cache.padding_size / 2);
 					keying_rect = Rect2(key_position.x - theme_cache.padding_size / 2, 0, key->get_width() + theme_cache.padding_size, header_height);
 
 					Color key_color(1, 1, 1);
@@ -2321,7 +2318,7 @@ void EditorInspectorSection::_notification(int p_what) {
 				const Ref<Texture2D> &revert = theme_cache.icon_gui_revert;
 				if (can_revert && revert.is_valid()) {
 					Point2 revert_position;
-					revert_position.x = (rtl ? margin_end : (get_size().width - revert->get_width() - margin_end)) - theme_cache.padding_size / 2;
+					revert_position.x = rtl ? margin_end + theme_cache.padding_size / 2 : (get_size().width - revert->get_width() - margin_end - theme_cache.padding_size / 2);
 					revert_rect = Rect2(revert_position.x - theme_cache.padding_size / 2, 0, revert->get_width() + theme_cache.padding_size, header_height);
 
 					Color revert_color(1, 1, 1);

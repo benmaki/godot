@@ -179,7 +179,10 @@ class PopupMenu : public Popup {
 	uint64_t search_time_msec = 0;
 	String search_string = "";
 
-	int search_bar_enabled_on_item_count = 0;
+	bool search_bar_enabled = false;
+	int search_bar_min_item_count = 0;
+	bool search_bar_fuzzy_search_enabled = true;
+	int search_bar_fuzzy_search_max_misses = 2;
 	PanelContainer *panel = nullptr;
 	VBoxContainer *vbox_container = nullptr;
 	LineEdit *search_bar = nullptr;
@@ -239,6 +242,7 @@ class PopupMenu : public Popup {
 	} theme_cache;
 
 	void _draw_items();
+	void _update_search_bar_visibility();
 	void _search_bar_input(const Ref<InputEvent> &p_event);
 	void _search_bar_text_changed(const String &p_new_text);
 	void _filter_items(const String &p_query);
@@ -387,10 +391,17 @@ public:
 	void set_prefer_native_menu(bool p_enabled);
 	bool is_prefer_native_menu() const;
 
+	void set_search_bar_enabled(bool p_enabled);
 	bool is_search_bar_enabled() const;
 
-	void set_search_bar_enabled_on_item_count(int p_count);
-	int get_search_bar_enabled_on_item_count() const;
+	void set_search_bar_min_item_count(int p_count);
+	int get_search_bar_min_item_count() const;
+
+	void set_search_bar_fuzzy_search_enabled(bool p_enabled);
+	bool is_search_bar_fuzzy_search_enabled() const;
+
+	void set_search_bar_fuzzy_search_max_misses(int p_max_misses);
+	int get_search_bar_fuzzy_search_max_misses() const;
 
 	bool is_native_menu() const;
 
