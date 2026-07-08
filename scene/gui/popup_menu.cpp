@@ -403,23 +403,29 @@ void PopupMenu::_activate_submenu(int p_over, bool p_by_keyboard) {
 	const float scroll_container_offset = scroll_container->get_global_position().y * win_scale;
 	const float ofs_cache = items[p_over]._ofs_cache * win_scale;
 	const float height_cache = items[p_over]._height_cache * win_scale;
+	const float item_top_y = ofs_cache + scroll_offset + scroll_container_offset - int(theme_v_separation * 0.5);
 
 	if (is_layout_rtl()) {
 		is_active_submenu_left = true;
-		submenu_pos += this_pos + Point2(-submenu_size.width + panel_offset_end.x, ofs_cache + scroll_offset - int(theme_v_separation * 0.5) + scroll_container_offset);
+		submenu_pos.x = this_pos.x - submenu_size.width + panel_offset_end.x;
 		if (submenu_pos.x < screen_rect.position.x) {
 			submenu_pos.x = this_pos.x + this_rect.size.width - panel_offset_start.x;
 			is_active_submenu_left = false;
 		}
-
 	} else {
 		is_active_submenu_left = false;
-		submenu_pos += this_pos + Point2(this_size.x + panel_offset_start.x, ofs_cache + scroll_offset - int(theme_v_separation * 0.5) + scroll_container_offset);
+		submenu_pos.x = this_pos.x + this_size.x + panel_offset_start.x;
 		if (submenu_pos.x + submenu_size.width > screen_rect.position.x + screen_rect.size.width) {
 			submenu_pos.x = this_pos.x - submenu_size.width + panel_offset_end.x;
 			is_active_submenu_left = true;
 		}
 	}
+
+	submenu_pos.y = this_pos.y + item_top_y - submenu_popup->theme_cache.panel_style->get_margin(SIDE_TOP) * win_scale;
+	if (submenu_popup->search_bar->is_visible()) {
+		submenu_pos.y -= (submenu_popup->search_bar->get_minimum_size().y + submenu_popup->theme_cache.search_bar_separation) * win_scale;
+	}
+
 	submenu_popup->set_position(submenu_pos);
 	submenu_popup->activated_by_keyboard = p_by_keyboard;
 	// If not triggered by the mouse, start the popup with its first enabled item focused.
@@ -454,7 +460,7 @@ void PopupMenu::_activate_submenu(int p_over, bool p_by_keyboard) {
 	submenu_popup->clear_autohide_areas();
 	// Add an autohide area above the submenu item unless it's the top item.
 	// This avoids a narrow strip of area that can trigger the submenu to reload when reentering the parent item from the top.
-	const int y_to_item_top = ofs_cache + scroll_offset - int(theme_v_separation * 0.5) + theme_cache.panel_style->get_margin(SIDE_TOP) * win_scale;
+	const int y_to_item_top = item_top_y - panel_offset_start.y;
 	Rect2 top_rect = Rect2(this_rect.position.x, this_rect.position.y, this_size.width, y_to_item_top);
 	if (active_submenu_index != 0) {
 		submenu_popup->add_autohide_area(top_rect);
@@ -534,6 +540,7 @@ void PopupMenu::_input_from_window_internal(const Ref<InputEvent> &p_event) {
 				if (!items[i].separator && !items[i].disabled && items[i].visible) {
 					prev_mouse_over = mouse_over;
 					mouse_over = i;
+					control->grab_focus();
 					emit_signal(SNAME("id_focused"), items[i].id);
 					scroll_to_item(i);
 					queue_accessibility_update();
@@ -550,6 +557,7 @@ void PopupMenu::_input_from_window_internal(const Ref<InputEvent> &p_event) {
 					if (!items[i].separator && !items[i].disabled && items[i].visible) {
 						prev_mouse_over = mouse_over;
 						mouse_over = i;
+						control->grab_focus();
 						emit_signal(SNAME("id_focused"), items[i].id);
 						scroll_to_item(i);
 						queue_accessibility_update();
@@ -577,6 +585,7 @@ void PopupMenu::_input_from_window_internal(const Ref<InputEvent> &p_event) {
 				if (!items[i].separator && !items[i].disabled && items[i].visible) {
 					prev_mouse_over = mouse_over;
 					mouse_over = i;
+					control->grab_focus();
 					emit_signal(SNAME("id_focused"), items[i].id);
 					scroll_to_item(i);
 					queue_accessibility_update();
@@ -593,6 +602,7 @@ void PopupMenu::_input_from_window_internal(const Ref<InputEvent> &p_event) {
 					if (!items[i].separator && !items[i].disabled && items[i].visible) {
 						prev_mouse_over = mouse_over;
 						mouse_over = i;
+						control->grab_focus();
 						emit_signal(SNAME("id_focused"), items[i].id);
 						scroll_to_item(i);
 						queue_accessibility_update();
@@ -878,6 +888,7 @@ void PopupMenu::_draw_items() {
 	// In Item::checkable_type enum order (less the non-checkable member), with disabled repeated at the end.
 	Ref<Texture2D> check[] = { theme_cache.checked, theme_cache.radio_checked, theme_cache.checked_disabled, theme_cache.radio_checked_disabled };
 	Ref<Texture2D> uncheck[] = { theme_cache.unchecked, theme_cache.radio_unchecked, theme_cache.unchecked_disabled, theme_cache.radio_unchecked_disabled };
+	Ref<Texture2D> indeterminate[] = { theme_cache.indeterminate, theme_cache.indeterminate_disabled };
 	Ref<Texture2D> submenu;
 	if (rtl) {
 		submenu = theme_cache.submenu_mirrored;
@@ -976,7 +987,13 @@ void PopupMenu::_draw_items() {
 		// Checkboxes
 		if (items[i].checkable_type && !items[i].separator) {
 			int disabled = int(items[i].disabled) * 2;
-			Texture2D *icon = (items[i].checked ? check[items[i].checkable_type - 1 + disabled] : uncheck[items[i].checkable_type - 1 + disabled]).ptr();
+			Texture2D *icon;
+			if (items[i].indeterminate) {
+				icon = indeterminate[disabled].ptr();
+			} else {
+				icon = (items[i].checked ? check[items[i].checkable_type - 1 + disabled] : uncheck[items[i].checkable_type - 1 + disabled]).ptr();
+			}
+
 			if (rtl) {
 				icon->draw(ci, Size2(control->get_size().width - item_ofs.x - icon->get_width(), item_ofs.y) + Point2(0, Math::floor((h - icon->get_height()) / 2.0)), icon_color);
 			} else {
@@ -1081,16 +1098,34 @@ void PopupMenu::_draw_items() {
 
 void PopupMenu::_update_search_bar_visibility() {
 	if (search_bar) {
-		search_bar->set_visible(search_bar_enabled && items.size() >= search_bar_min_item_count);
+		if (search_bar_enabled) {
+			int item_count = 0;
+			for (const Item &item : items) {
+				if (!item.separator) {
+					item_count++;
+				}
+			}
+			search_bar->set_visible(item_count >= search_bar_min_item_count);
+		} else {
+			search_bar->hide();
+		}
 	}
 }
 
-void PopupMenu::_search_bar_input(const Ref<InputEvent> &p_event) {
-	// Redirect navigational key events to the tree.
-	Ref<InputEventKey> key = p_event;
-	if (key.is_valid()) {
-		if (key->is_action("ui_up", true) || key->is_action("ui_down", true) || key->is_action("ui_page_up") || key->is_action("ui_page_down")) {
-			search_bar->accept_event();
+void PopupMenu::_items_focus_entered() {
+	if (mouse_over != -1) {
+		return;
+	}
+
+	for (int i = 0; i < items.size(); i++) {
+		if (!items[i].separator && !items[i].disabled && items[i].visible) {
+			prev_mouse_over = mouse_over;
+			mouse_over = i;
+			emit_signal(SNAME("id_focused"), items[i].id);
+			scroll_to_item(i);
+			queue_accessibility_update();
+			control->queue_redraw();
+			break;
 		}
 	}
 }
@@ -1103,6 +1138,13 @@ void PopupMenu::_search_bar_text_changed(const String &p_new_text) {
 	child_controls_changed();
 	notify_property_list_changed();
 	_menu_changed();
+}
+
+void PopupMenu::_search_bar_focus_entered() {
+	prev_mouse_over = mouse_over;
+	mouse_over = -1;
+	queue_accessibility_update();
+	control->queue_redraw();
 }
 
 void PopupMenu::_filter_items(const String &p_query) {
@@ -1145,16 +1187,13 @@ void PopupMenu::_filter_items(const String &p_query) {
 		}
 	}
 
-	Vector<FuzzySearchResult> results;
 	FuzzySearch fuzzy;
-	fuzzy.max_results = search_candidates.size();
-	fuzzy.max_misses = search_bar_fuzzy_search_max_misses;
-	fuzzy.allow_subsequences = search_bar_fuzzy_search_enabled;
-	fuzzy.set_query(p_query, false);
-	fuzzy.search_all(search_candidates, results);
+	fuzzy.set_max_results(search_candidates.size());
+	fuzzy.set_max_misses(search_bar_fuzzy_search_max_misses);
+	fuzzy.set_use_exact_tokens(!search_bar_fuzzy_search_enabled);
 
-	for (const FuzzySearchResult &result : results) {
-		PopupMenu::Item &item = items.write[search_candidate_to_item[result.original_index]];
+	for (const Ref<FuzzySearchMatch> &result : fuzzy.search_all(p_query, search_candidates)) {
+		PopupMenu::Item &item = items.write[search_candidate_to_item[result->get_original_index()]];
 		item.visible = true;
 		if (item.submenu) {
 			for (PopupMenu::Item &submenu_item : item.submenu->items) {
@@ -1176,7 +1215,7 @@ void PopupMenu::_close_or_suspend() {
 	if (this_submenu_index != -1) { // Is a submenu.
 		PopupMenu *parent_popup = Object::cast_to<PopupMenu>(get_parent());
 		ERR_FAIL_NULL(parent_popup);
-		Point2 mouse_pos = is_embedded() ? parent_popup->get_mouse_position() : Point2(DisplayServer::get_singleton()->mouse_get_position() - parent_popup->get_position());
+		Point2 mouse_pos = is_embedded() ? parent_popup->get_mouse_position() * parent_popup->get_content_scale_factor() : Point2(DisplayServer::get_singleton()->mouse_get_position() - parent_popup->get_position());
 		if (parent_popup->_get_mouse_over(mouse_pos) == this_submenu_index) {
 			parent_popup->submenu_mouse_exited_ticks_msec = -1;
 			parent_popup->mouse_movement_was_tested = false;
@@ -1369,7 +1408,14 @@ void PopupMenu::_notification(int p_what) {
 			ERR_FAIL_COND(ae.is_null());
 
 			AccessibilityServer::get_singleton()->update_set_role(ae, AccessibilityServerEnums::AccessibilityRole::ROLE_MENU);
-			AccessibilityServer::get_singleton()->update_set_list_item_count(ae, items.size());
+
+			int item_count = 0;
+			for (const Item &item : items) {
+				if (item.visible && !item.separator) {
+					item_count++;
+				}
+			}
+			AccessibilityServer::get_singleton()->update_set_list_item_count(ae, item_count);
 
 			if (accessibility_scroll_element.is_null()) {
 				accessibility_scroll_element = AccessibilityServer::get_singleton()->create_sub_element(ae, AccessibilityServerEnums::AccessibilityRole::ROLE_CONTAINER);
@@ -1380,25 +1426,26 @@ void PopupMenu::_notification(int p_what) {
 			AccessibilityServer::get_singleton()->update_set_transform(accessibility_scroll_element, scroll_xform);
 			AccessibilityServer::get_singleton()->update_set_bounds(accessibility_scroll_element, Rect2(0, 0, get_size().x, scroll_container->get_v_scroll_bar()->get_max()));
 
-			float scroll_width = scroll_container->get_v_scroll_bar()->is_visible_in_tree() ? scroll_container->get_v_scroll_bar()->get_size().width : 0;
-			float display_width = control->get_size().width - scroll_width;
-			Point2 ofs;
+			float display_width = control->get_size().width;
+			Point2 ofs = scroll_container->get_global_position();
 
+			int item_index = 0;
+			bool first_visible = true;
 			for (int i = 0; i < items.size(); i++) {
 				const Item &item = items.write[i];
-				if (!item.visible) {
-					continue;
-				}
 
-				// Avoid discrepancy between min size and drawn items due to rounding.
-				ofs.y += i > 0 ? theme_cache.v_separation : theme_cache.v_separation - (theme_cache.v_separation / 2);
-
-				Point2 item_ofs = ofs;
 				if (item.accessibility_item_element.is_null()) {
 					item.accessibility_item_element = AccessibilityServer::get_singleton()->create_sub_element(accessibility_scroll_element, AccessibilityServerEnums::AccessibilityRole::ROLE_MENU_ITEM);
 					item.accessibility_item_dirty = true;
 				}
 
+				if (item.visible) {
+					// Avoid discrepancy between min size and drawn items due to rounding.
+					ofs.y += first_visible ? 0 : theme_cache.v_separation;
+					first_visible = false;
+				}
+
+				Point2 item_ofs = ofs;
 				item_ofs.x += item.indent * theme_cache.indent;
 				float h = _get_item_height(i);
 
@@ -1418,18 +1465,26 @@ void PopupMenu::_notification(int p_what) {
 					}
 
 					AccessibilityServer::get_singleton()->update_add_action(item.accessibility_item_element, AccessibilityServerEnums::AccessibilityAction::ACTION_CLICK, callable_mp(this, &PopupMenu::_accessibility_action_click).bind(i));
-					AccessibilityServer::get_singleton()->update_set_list_item_index(item.accessibility_item_element, i);
+					AccessibilityServer::get_singleton()->update_set_list_item_index(item.accessibility_item_element, item_index);
 					AccessibilityServer::get_singleton()->update_set_list_item_level(item.accessibility_item_element, 0);
 					AccessibilityServer::get_singleton()->update_set_list_item_selected(item.accessibility_item_element, i == mouse_over);
 					AccessibilityServer::get_singleton()->update_set_name(item.accessibility_item_element, item.xl_text);
 					AccessibilityServer::get_singleton()->update_set_flag(item.accessibility_item_element, AccessibilityServerEnums::AccessibilityFlags::FLAG_DISABLED, item.disabled);
+					AccessibilityServer::get_singleton()->update_set_flag(item.accessibility_item_element, AccessibilityServerEnums::AccessibilityFlags::FLAG_HIDDEN, !item.visible);
 					AccessibilityServer::get_singleton()->update_set_tooltip(item.accessibility_item_element, item.tooltip);
 
 					AccessibilityServer::get_singleton()->update_set_bounds(item.accessibility_item_element, Rect2(item_ofs, Size2(display_width, h + theme_cache.v_separation)));
 
 					item.accessibility_item_dirty = false;
 				}
-				ofs.y += h;
+
+				if (item.visible) {
+					ofs.y += h;
+
+					if (!item.separator) {
+						item_index++;
+					}
+				}
 			}
 			prev_mouse_over = -1;
 
@@ -2231,9 +2286,34 @@ void PopupMenu::set_item_checked(int p_idx, bool p_checked) {
 
 	items.write[p_idx].checked = p_checked;
 	items.write[p_idx].accessibility_item_dirty = true;
+	items.write[p_idx].indeterminate = false;
 
 	if (global_menu.is_valid()) {
 		NativeMenu::get_singleton()->set_item_checked(global_menu, p_idx, p_checked);
+	}
+
+	queue_accessibility_update();
+	control->queue_redraw();
+	child_controls_changed();
+	_menu_changed();
+}
+
+void PopupMenu::set_item_indeterminate(int p_idx, bool p_indeterminate) {
+	if (p_idx < 0) {
+		p_idx += get_item_count();
+	}
+	ERR_FAIL_INDEX(p_idx, items.size());
+
+	if (items[p_idx].indeterminate == p_indeterminate) {
+		return;
+	}
+
+	items.write[p_idx].indeterminate = p_indeterminate;
+	items.write[p_idx].accessibility_item_dirty = true;
+	items.write[p_idx].checked = false;
+
+	if (global_menu.is_valid()) {
+		NativeMenu::get_singleton()->set_item_indeterminate(global_menu, p_idx, p_indeterminate);
 	}
 
 	queue_accessibility_update();
@@ -2411,7 +2491,7 @@ void PopupMenu::_submenu_hidden() {
 	queue_accessibility_update();
 	control->queue_redraw();
 	if (!activated_by_keyboard) {
-		Point2 mouse_pos = is_embedded() ? get_mouse_position() : Point2(DisplayServer::get_singleton()->mouse_get_position() - get_position());
+		Point2 mouse_pos = is_embedded() ? get_mouse_position() * get_content_scale_factor() : Point2(DisplayServer::get_singleton()->mouse_get_position() - get_position());
 		_mouse_over_update(mouse_pos);
 	}
 }
@@ -2499,6 +2579,11 @@ bool PopupMenu::is_item_disabled(int p_idx) const {
 bool PopupMenu::is_item_checked(int p_idx) const {
 	ERR_FAIL_INDEX_V(p_idx, items.size(), false);
 	return items[p_idx].checked;
+}
+
+bool PopupMenu::is_item_indeterminate(int p_idx) const {
+	ERR_FAIL_INDEX_V(p_idx, items.size(), false);
+	return items[p_idx].indeterminate;
 }
 
 int PopupMenu::get_item_id(int p_idx) const {
@@ -3236,19 +3321,6 @@ bool PopupMenu::get_allow_search() const {
 	return allow_search;
 }
 
-String PopupMenu::get_tooltip(const Point2 &p_pos) const {
-	Point2 pos = p_pos;
-	// Adjust for the top style margin and search bar.
-	pos.y += scroll_container->get_global_position().y;
-
-	int over = _get_mouse_over(pos);
-	if (over < 0 || over >= items.size()) {
-		return "";
-	}
-
-	return items[over].tooltip;
-}
-
 void PopupMenu::set_search_bar_enabled(bool p_enabled) {
 	search_bar_enabled = p_enabled;
 	_update_search_bar_visibility();
@@ -3392,6 +3464,7 @@ void PopupMenu::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_item_icon_max_width", "index", "width"), &PopupMenu::set_item_icon_max_width);
 	ClassDB::bind_method(D_METHOD("set_item_icon_modulate", "index", "modulate"), &PopupMenu::set_item_icon_modulate);
 	ClassDB::bind_method(D_METHOD("set_item_checked", "index", "checked"), &PopupMenu::set_item_checked);
+	ClassDB::bind_method(D_METHOD("set_item_indeterminate", "index", "indeterminate"), &PopupMenu::set_item_indeterminate);
 	ClassDB::bind_method(D_METHOD("set_item_id", "index", "id"), &PopupMenu::set_item_id);
 	ClassDB::bind_method(D_METHOD("set_item_accelerator", "index", "accel"), &PopupMenu::set_item_accelerator);
 	ClassDB::bind_method(D_METHOD("set_item_metadata", "index", "metadata"), &PopupMenu::set_item_metadata);
@@ -3420,6 +3493,7 @@ void PopupMenu::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_item_icon_max_width", "index"), &PopupMenu::get_item_icon_max_width);
 	ClassDB::bind_method(D_METHOD("get_item_icon_modulate", "index"), &PopupMenu::get_item_icon_modulate);
 	ClassDB::bind_method(D_METHOD("is_item_checked", "index"), &PopupMenu::is_item_checked);
+	ClassDB::bind_method(D_METHOD("is_item_indeterminate", "index"), &PopupMenu::is_item_indeterminate);
 	ClassDB::bind_method(D_METHOD("get_item_id", "index"), &PopupMenu::get_item_id);
 	ClassDB::bind_method(D_METHOD("get_item_index", "id"), &PopupMenu::get_item_index);
 	ClassDB::bind_method(D_METHOD("get_item_accelerator", "index"), &PopupMenu::get_item_accelerator);
@@ -3525,6 +3599,8 @@ void PopupMenu::_bind_methods() {
 
 	BIND_THEME_ITEM(Theme::DATA_TYPE_ICON, PopupMenu, checked);
 	BIND_THEME_ITEM(Theme::DATA_TYPE_ICON, PopupMenu, checked_disabled);
+	BIND_THEME_ITEM(Theme::DATA_TYPE_ICON, PopupMenu, indeterminate);
+	BIND_THEME_ITEM(Theme::DATA_TYPE_ICON, PopupMenu, indeterminate_disabled);
 	BIND_THEME_ITEM(Theme::DATA_TYPE_ICON, PopupMenu, unchecked);
 	BIND_THEME_ITEM(Theme::DATA_TYPE_ICON, PopupMenu, unchecked_disabled);
 	BIND_THEME_ITEM(Theme::DATA_TYPE_ICON, PopupMenu, radio_checked);
@@ -3560,6 +3636,7 @@ void PopupMenu::_bind_methods() {
 	base_property_helper.register_property(PropertyInfo(Variant::OBJECT, "icon", PROPERTY_HINT_RESOURCE_TYPE, Texture2D::get_class_static()), defaults.icon, &PopupMenu::set_item_icon, &PopupMenu::get_item_icon);
 	base_property_helper.register_property(PropertyInfo(Variant::INT, "checkable", PROPERTY_HINT_ENUM, "No,As checkbox,As radio button"), defaults.checkable_type, &PopupMenu::_set_item_checkable_type, &PopupMenu::_get_item_checkable_type);
 	base_property_helper.register_property(PropertyInfo(Variant::BOOL, "checked"), defaults.checked, &PopupMenu::set_item_checked, &PopupMenu::is_item_checked);
+	base_property_helper.register_property(PropertyInfo(Variant::BOOL, "indeterminate"), defaults.indeterminate, &PopupMenu::set_item_indeterminate, &PopupMenu::is_item_indeterminate);
 	base_property_helper.register_property(PropertyInfo(Variant::INT, "id", PROPERTY_HINT_RANGE, "0,10,1,or_greater", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_STORE_IF_NULL), defaults.id, &PopupMenu::set_item_id, &PopupMenu::get_item_id);
 	base_property_helper.register_property(PropertyInfo(Variant::BOOL, "disabled"), defaults.disabled, &PopupMenu::set_item_disabled, &PopupMenu::is_item_disabled);
 	base_property_helper.register_property(PropertyInfo(Variant::BOOL, "separator"), defaults.separator, &PopupMenu::set_item_as_separator, &PopupMenu::is_item_separator);
@@ -3636,7 +3713,7 @@ bool PopupMenu::get_shrink_width() const {
 	return shrink_width;
 }
 
-void PopupMenu::_pre_popup() {
+void PopupMenu::_pre_popup(const Size2i &p_size) {
 	real_t popup_scale = 1.0;
 	bool scale_with_parent = true;
 	Node *parent_node = get_parent();
@@ -3678,6 +3755,9 @@ void PopupMenu::_pre_popup() {
 
 	set_content_scale_factor(popup_scale);
 	if (is_wrapping_controls()) {
+		if (scale_with_parent) {
+			set_size(p_size);
+		}
 		Size2 minsize = get_contents_minimum_size() * popup_scale;
 		Size2 maxsize = get_max_size();
 		if (maxsize.height > 0) {
@@ -3705,7 +3785,7 @@ void PopupMenu::set_visible(bool p_visible) {
 		PopupMenu *parent_popup = Object::cast_to<PopupMenu>(get_parent());
 		if (!parent_popup) {
 			if (search_bar->is_visible()) {
-				search_bar->edit(true);
+				search_bar->edit();
 			}
 		}
 	}
@@ -3721,6 +3801,18 @@ void PopupMenu::set_visible(bool p_visible) {
 		}
 
 		Popup::set_visible(p_visible);
+	}
+}
+
+RID PopupMenuItems::get_focused_accessibility_element() const {
+	return popup->get_focused_accessibility_element();
+}
+
+void PopupMenuItems::gui_input(const Ref<InputEvent> &p_event) {
+	if (p_event->is_action("ui_up") || p_event->is_action("ui_down")) {
+		// We've already handled these in `PopupMenu::_input_from_window`, and these events will be handled as focus navigation if we don't stop them from propagating, causing focus to jump to the search bar.
+		accept_event();
+		return;
 	}
 }
 
@@ -3745,8 +3837,9 @@ PopupMenu::PopupMenu() {
 	search_bar->set_clear_button_enabled(true);
 	search_bar->set_placeholder(ETR("Search"));
 	search_bar->set_keep_editing_on_text_submit(true);
+	search_bar->set_virtual_keyboard_show_on_focus(false);
 	search_bar->connect(SceneStringName(text_changed), callable_mp(this, &PopupMenu::_search_bar_text_changed));
-	search_bar->connect(SceneStringName(gui_input), callable_mp(this, &PopupMenu::_search_bar_input));
+	search_bar->connect(SceneStringName(focus_entered), callable_mp(this, &PopupMenu::_search_bar_focus_entered));
 	vbox_container->add_child(search_bar, false, INTERNAL_MODE_FRONT);
 
 	// Scroll Container
@@ -3758,13 +3851,15 @@ PopupMenu::PopupMenu() {
 	scroll_container->add_theme_style_override(SceneStringName(panel), memnew(StyleBoxEmpty));
 
 	// The control which will display the items
-	control = memnew(Control);
+	control = memnew(PopupMenuItems(this));
 	control->set_clip_contents(false);
 	control->set_anchors_and_offsets_preset(Control::PRESET_FULL_RECT);
 	control->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	control->set_v_size_flags(Control::SIZE_EXPAND_FILL);
+	control->set_focus_mode(Control::FOCUS_ALL);
 	scroll_container->add_child(control, false, INTERNAL_MODE_FRONT);
 	control->connect(SceneStringName(draw), callable_mp(this, &PopupMenu::_draw_items));
+	control->connect(SceneStringName(focus_entered), callable_mp(this, &PopupMenu::_items_focus_entered));
 
 	submenu_timer = memnew(Timer);
 	submenu_timer->set_wait_time(submenu_timer_popup_delay); // Default is 0.2.
@@ -3787,4 +3882,12 @@ PopupMenu::PopupMenu() {
 
 PopupMenu::~PopupMenu() {
 	unbind_global_menu();
+}
+
+String PopupMenuItems::get_tooltip(const Point2 &p_pos) const {
+	int over = popup->_get_mouse_over(get_global_transform_with_canvas().xform(p_pos) * popup->get_content_scale_factor());
+	if (over < 0 || over >= popup->items.size()) {
+		return "";
+	}
+	return popup->items[over].tooltip;
 }

@@ -41,9 +41,12 @@ class PanelContainer;
 class VBoxContainer;
 class LineEdit;
 class Timer;
+class PopupMenuItems;
 
 class PopupMenu : public Popup {
 	GDCLASS(PopupMenu, Popup);
+
+	friend class PopupMenuItems;
 
 	static HashMap<NativeMenu::SystemMenus, PopupMenu *> system_menus;
 
@@ -74,6 +77,7 @@ class PopupMenu : public Popup {
 		int state = 0;
 		bool separator = false;
 		bool disabled = false;
+		bool indeterminate = false;
 		bool dirty = true;
 		int id = 0;
 		Variant metadata;
@@ -187,7 +191,7 @@ class PopupMenu : public Popup {
 	VBoxContainer *vbox_container = nullptr;
 	LineEdit *search_bar = nullptr;
 	ScrollContainer *scroll_container = nullptr;
-	Control *control = nullptr;
+	PopupMenuItems *control = nullptr;
 
 	const float DEFAULT_GAMEPAD_EVENT_DELAY_MS = 0.5;
 	const float GAMEPAD_EVENT_REPEAT_RATE_MS = 1.0 / 20;
@@ -215,6 +219,8 @@ class PopupMenu : public Popup {
 		Ref<Texture2D> checked_disabled;
 		Ref<Texture2D> unchecked;
 		Ref<Texture2D> unchecked_disabled;
+		Ref<Texture2D> indeterminate;
+		Ref<Texture2D> indeterminate_disabled;
 		Ref<Texture2D> radio_checked;
 		Ref<Texture2D> radio_checked_disabled;
 		Ref<Texture2D> radio_unchecked;
@@ -243,8 +249,9 @@ class PopupMenu : public Popup {
 
 	void _draw_items();
 	void _update_search_bar_visibility();
-	void _search_bar_input(const Ref<InputEvent> &p_event);
+	void _items_focus_entered();
 	void _search_bar_text_changed(const String &p_new_text);
+	void _search_bar_focus_entered();
 	void _filter_items(const String &p_query);
 
 	void _close_pressed();
@@ -261,7 +268,7 @@ class PopupMenu : public Popup {
 	bool shrink_width = true;
 
 protected:
-	virtual void _pre_popup() override;
+	virtual void _pre_popup(const Size2i &p_size) override;
 	virtual Rect2i _popup_adjust_rect() const override;
 
 	virtual void add_child_notify(Node *p_child) override;
@@ -334,6 +341,7 @@ public:
 	void set_item_icon_max_width(int p_idx, int p_width);
 	void set_item_icon_modulate(int p_idx, const Color &p_modulate);
 	void set_item_checked(int p_idx, bool p_checked);
+	void set_item_indeterminate(int p_idx, bool p_indeterminate);
 	void set_item_id(int p_idx, int p_id);
 	void set_item_accelerator(int p_idx, Key p_accel);
 	void set_item_metadata(int p_idx, const Variant &p_meta);
@@ -364,6 +372,7 @@ public:
 	int get_item_icon_max_width(int p_idx) const;
 	Color get_item_icon_modulate(int p_idx) const;
 	bool is_item_checked(int p_idx) const;
+	bool is_item_indeterminate(int p_idx) const;
 	int get_item_id(int p_idx) const;
 	int get_item_index(int p_id) const;
 	Key get_item_accelerator(int p_idx) const;
@@ -419,8 +428,6 @@ public:
 
 	void clear(bool p_free_submenus = true);
 
-	virtual String get_tooltip(const Point2 &p_pos) const;
-
 #ifdef TOOLS_ENABLED
 	PackedStringArray get_configuration_warnings() const override;
 #endif
@@ -453,4 +460,17 @@ public:
 
 	PopupMenu();
 	~PopupMenu();
+};
+
+class PopupMenuItems : public Control {
+	GDCLASS(PopupMenuItems, Control);
+
+	PopupMenu *popup = nullptr;
+
+public:
+	PopupMenuItems(PopupMenu *p_popup) : popup(p_popup) {}
+
+	virtual RID get_focused_accessibility_element() const override;
+	virtual void gui_input(const Ref<InputEvent> &p_event) override;
+	virtual String get_tooltip(const Point2 &p_pos) const override;
 };

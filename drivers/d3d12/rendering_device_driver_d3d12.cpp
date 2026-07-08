@@ -1288,7 +1288,6 @@ RDD::TextureID RenderingDeviceDriverD3D12::texture_create(const TextureFormat &p
 			relaxed_casting_format_count++;
 		}
 
-		HashMap<DataFormat, D3D12_RESOURCE_FLAGS> aliases_forbidden_flags;
 		for (int i = 0; i < p_format.shareable_formats.size(); i++) {
 			DataFormat curr_format = p_format.shareable_formats[i];
 			String format_text = "'" + String(FORMAT_NAMES[p_format.format]) + "'";
@@ -2577,18 +2576,9 @@ RDD::CommandBufferID RenderingDeviceDriverD3D12::command_buffer_create(CommandPo
 
 	ComPtr<ID3D12GraphicsCommandList> cmd_list;
 	{
-		ComPtr<ID3D12Device4> device_4;
-		device->QueryInterface(device_4.GetAddressOf());
-		HRESULT res = E_FAIL;
-		if (device_4) {
-			res = device_4->CreateCommandList1(0, list_type, D3D12_COMMAND_LIST_FLAG_NONE, IID_PPV_ARGS(cmd_list.GetAddressOf()));
-		} else {
-			res = device->CreateCommandList(0, list_type, cmd_allocator.Get(), nullptr, IID_PPV_ARGS(cmd_list.GetAddressOf()));
-		}
+		HRESULT res = device->CreateCommandList(0, list_type, cmd_allocator.Get(), nullptr, IID_PPV_ARGS(cmd_list.GetAddressOf()));
 		ERR_FAIL_COND_V_MSG(!SUCCEEDED(res), CommandBufferID(), "CreateCommandList failed with error " + vformat("0x%08ux", (uint64_t)res) + ".");
-		if (!device_4) {
-			cmd_list->Close();
-		}
+		cmd_list->Close();
 	}
 
 	CPUDescriptorHeapPool::Allocation uav_alloc;
@@ -5140,7 +5130,6 @@ RDD::PipelineID RenderingDeviceDriverD3D12::render_pipeline_create(
 	RenderPipelineInfo render_info;
 
 	// Attachments.
-	LocalVector<uint32_t> color_attachments;
 	{
 		const Subpass &subpass = pass_info->subpasses[p_render_subpass];
 
