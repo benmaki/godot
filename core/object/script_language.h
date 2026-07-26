@@ -233,8 +233,12 @@ public:
 	struct Warning {
 		/// One-based.
 		int start_line = 0;
+		int start_column = -1;
+
 		/// One-based.
 		int end_line = 0;
+		int end_column = -1;
+
 		int code;
 		String string_code;
 		String message;
@@ -242,10 +246,11 @@ public:
 
 	struct ScriptError {
 		String path;
-		/// One-based.
-		int line = -1;
-		/// One-based.
-		int column = -1;
+		/// All one-based.
+		int start_line = -1;
+		int start_column = -1;
+		int end_line = -1;
+		int end_column = -1;
 		String message;
 	};
 
@@ -290,7 +295,6 @@ public:
 	virtual bool supports_builtin_mode() const = 0;
 	virtual bool supports_documentation() const { return false; }
 	virtual bool can_inherit_from_file() const { return false; }
-	virtual int find_function(const String &p_function, const String &p_code) const = 0;
 	virtual String make_function(const String &p_class, const String &p_name, const PackedStringArray &p_args) const = 0;
 	virtual bool can_make_function() const { return true; }
 	virtual Error open_in_external_editor(const Ref<Script> &p_script, int p_line, int p_col) { return ERR_UNAVAILABLE; }
